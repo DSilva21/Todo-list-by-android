@@ -8,15 +8,20 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.firebase.ui.database.FirebaseRecyclerAdapter;
+import com.firebase.ui.database.FirebaseRecyclerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -139,6 +144,135 @@ public class HomeActivity extends AppCompatActivity {
                         }
                     });
                 }
+                dialog.dismiss();
+            }
+        });
+
+        dialog.show();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        FirebaseRecyclerOptions<Model> options=new FirebaseRecyclerOptions.Builder<Model>()
+                .setQuery(reference, Model.class)
+                .build();
+
+        FirebaseRecyclerAdapter<Model,MyViewholder> adapter=new FirebaseRecyclerAdapter<Model, MyViewholder>(options) {
+            @Override
+            protected void onBindViewHolder(@NonNull MyViewholder holder, final int position, @NonNull final Model model) {
+                holder.setDate(model.getDate());
+                holder.setTask(model.getTask());
+                holder.setDesc(model.getDescription());
+
+                holder.mView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        key=getRef(position).getKey();
+                        task=model.getTask();
+                        description=model.getDescription();
+
+                        updateTask();
+                    }
+                });
+            }
+
+            @NonNull
+            @Override
+            public MyViewholder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                View view=LayoutInflater.from(parent.getContext()).inflate(R.layout.retrieved_layout, parent,false);
+                return new MyViewholder(view);
+            }
+        };
+
+        recyclerView.setAdapter(adapter);
+        adapter.startListening();
+    }
+
+    public static class MyViewholder extends RecyclerView.ViewHolder{
+        View mView;
+
+        public MyViewholder(@NonNull View itemView) {
+            super(itemView);
+            mView=itemView;
+        }
+        public void setTask(String task){
+            TextView taskTextView=mView.findViewById(R.id.taskTv);
+            taskTextView.setText(task);
+        }
+
+        public void setDesc(String desc){
+            TextView descTextView=mView.findViewById(R.id.descriptionTv);
+            descTextView.setText(desc);
+        }
+
+        public void setDate(String date){
+            TextView dateTextView=mView.findViewById(R.id.dateTv);
+            dateTextView.setText(date);
+        }
+    }
+
+    private void updateTask(){
+        AlertDialog.Builder myDialog=new AlertDialog.Builder(this);
+        LayoutInflater inflater=LayoutInflater.from(this);
+        View view=inflater.inflate(R.layout.update_data, null);
+        myDialog.setView(view);
+
+        final AlertDialog dialog= myDialog.create();
+        final EditText mTask=view.findViewById(R.id.mEditTextTask);
+        final EditText mDescription=view.findViewById(R.id.mEditTextDescription);
+
+        mTask.setText(task);
+        mTask.setSelection(task.length());
+
+        mDescription.setText(description);
+        mDescription.setSelection(description.length());
+
+        Button delButton=view.findViewById(R.id.btnDelete);
+        Button updateButton=view.findViewById(R.id.btnUpdate);
+
+        updateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                task= mTask.getText().toString().trim();
+                description=mDescription.getText().toString().trim();
+                String date=DateFormat.getDateInstance().format(new Date());
+
+                Model model=new Model(task,description,key,date);
+
+                reference.child(key).setValue(model).addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if(task.isSuccessful()){
+                            Toast.makeText(HomeActivity.this, "Data has been update successfully", Toast.LENGTH_SHORT).show();
+                        }else{
+                            String err=task.getException().toString();
+                            Toast.makeText(HomeActivity.this, "update failed"+err, Toast.LENGTH_SHORT).show();
+                        }
+
+                    }
+                });
+                dialog.dismiss();
+
+            }
+        });
+
+        delButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                reference.child(key).removeValue().addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if(task.isSuccessful()){
+                            Toast.makeText(HomeActivity.this, "Task deleted successfully", Toast.LENGTH_SHORT).show();
+                        }
+                        else{
+                            String err=task.getException().toString();
+                            Toast.makeText(HomeActivity.this, "Failed to delete task"+err, Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
                 dialog.dismiss();
             }
         });
